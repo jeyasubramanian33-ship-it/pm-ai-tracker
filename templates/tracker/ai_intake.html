@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+
+{% block title %}AI Client Intake | {{ project.name }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1>AI Client Update Intake</h1>
+        <p class="subtitle">
+            Project: <strong>{{ project.name }}</strong> &bull; Local Ollama Model Runner
+        </p>
+    </div>
+    <a href="{% url 'project_detail' project.pk %}" class="btn btn-secondary">Back to Project</a>
+</div>
+
+{% if available_models %}
+    <div class="alert alert-info">
+        Ollama connected. Available local models: <strong>{{ available_models|join:", " }}</strong>
+    </div>
+{% else %}
+    <div class="alert alert-warning">
+        Local Ollama server was not detected on <code>http://localhost:11434</code>. Start Ollama (<code>ollama serve</code>) and ensure a model such as <code>{{ default_model }}</code> is pulled (<code>ollama pull {{ default_model }}</code>) before running analysis.
+    </div>
+{% endif %}
+
+{% if ai_error %}
+    <div class="alert alert-error">{{ ai_error }}</div>
+{% endif %}
+
+<div class="two-col">
+    <div class="card">
+        <h2>1. Paste Client Update</h2>
+        <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="analyze">
+            {% if from_existing_log %}
+                <input type="hidden" name="skip_client_log" value="1">
+            {% endif %}
+            {% for field in form %}
+                <div class="form-group">
+                    <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                    {{ field }}
+                    {% if field.help_text %}<div class="help-text">{{ field.help_text }}</div>{% endif %}
+                    {% if field.errors %}{{ field.errors }}{% endif %}
+                </div>
+            {% endfor %}
+            <button type="submit" class="btn btn-primary">Analyze with Ollama</button>
+        </form>
+    </div>
+
+    <div class="card">
+        <h2>2. Review &amp; Apply Suggestions</h2>
+        {% if analysis %}
+            {% if analysis.summary %}
+                <p><strong>Client Update Summary:</strong> {{ analysis.summary }}</p>
+            {% endif %}
+
+            <form method="post">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="apply">
+                <input type="hidden" name="client_message" value="{{ form.client_message.value|default:'' }}">
+                <input type="hidden" name="skip_client_log" value="{% if from_existing_log or request.POST.skip_client_log == '1' %}1{% else %}0{% endif %}">
+
+                <h3>Suggested Task Status Updates</h3>
+                {% if analysis.status_updates %}
+                    {% for item in analysis.status_updates %}
+                        <div class="suggestion-item">
+                            <label>
+                                <input type="checkbox" name="apply_status" value="{{ item.task.id }}" checked>
+                                <div>
+                                    <strong>{{ item.task.title }}</strong><br>
+                                    <span class="badge badge-{{ item.task.status }}">{{ item.task.get_status_display }}</span>
+                                    &rarr;
+                                    <span class="badge badge-{{ item.new_status }}">{{ item.new_status_label }}</span>
+                                    {% if item.reason %}
+                                        <div class="help-text">{{ item.reason }}</div>
+                                    {% endif %}
+                                </div>
+                            </label>
+                            <input type="hidden" name="new_status_{{ item.task.id }}" value="{{ item.new_status }}">
+                        </div>
+                    {% endfor %}
+                {% else %}
+                    <p class="help-text">No status changes detected for existing tasks.</p>
+                {% endif %}
+
+                <h3 style="margin-top: 16px;">Suggested New Tasks</h3>
+                {% if analysis.new_tasks %}
+                    {% for nt in analysis.new_tasks %}
+                        <div class="suggestion-item">
+                            <label>
+                                <input type="checkbox" name="apply_new_task" value="{{ forloop.counter0 }}" checked>
+                                <div>
+                                    <strong>{{ nt.title }}</strong> (Priority: {{ nt.priority|title }})
+                                    {% if nt.description %}
+                                        <div class="help-text">{{ nt.description }}</div>
+                                    {% endif %}
+                                </div>
+                            </label>
+                            <input type="hidden" name="new_task_title_{{ forloop.counter0 }}" value="{{ nt.title }}">
+                            <input type="hidden" name="new_task_priority_{{ forloop.counter0 }}" value="{{ nt.priority }}">
+                            <input type="hidden" name="new_task_desc_{{ forloop.counter0 }}" value="{{ nt.description }}">
+                        </div>
+                    {% endfor %}
+                {% else %}
+                    <p class="help-text">No new tasks suggested.</p>
+                {% endif %}
+
+                <div class="form-group" style="margin-top: 16px;">
+                    <label for="id_internal_handoff">Internal Team Handoff Brief (Editable, Internal Only)</label>
+                    <textarea id="id_internal_handoff" name="internal_handoff" rows="6">{{ analysis.internal_handoff }}</textarea>
+                </div>
+
+                <button type="submit" class="btn btn-primary">Approve &amp; Apply Updates</button>
+            </form>
+        {% else %}
+            <p class="empty-state">
+                Paste a client email or message on the left and click <strong>Analyze with Ollama</strong> to preview task status suggestions and an internal team handoff brief.
+            </p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+
+{% block title %}AI Follow-Up & Summary | {{ project.name }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1>AI Follow-Up &amp; Health Summary</h1>
+        <p class="subtitle">Project: <strong>{{ project.name }}</strong> &bull; Client: {{ project.client_name }}</p>
+    </div>
+    <a href="{% url 'project_detail' project.pk %}" class="btn btn-secondary">Back to Project</a>
+</div>
+
+{% if available_models %}
+    <div class="alert alert-info">
+        Ollama connected. Available local models: <strong>{{ available_models|join:", " }}</strong>
+    </div>
+{% else %}
+    <div class="alert alert-warning">
+        Local Ollama server was not detected on <code>http://localhost:11434</code>. Start Ollama and pull <code>{{ default_model }}</code> to generate drafts.
+    </div>
+{% endif %}
+
+{% if ai_error %}
+    <div class="alert alert-error">{{ ai_error }}</div>
+{% endif %}
+
+<div class="two-col">
+    <div class="card">
+        <h2>Generate with Ollama</h2>
+        <form method="post">
+            {% csrf_token %}
+            <div class="form-group">
+                <label for="id_model_name">Ollama Model Name</label>
+                <input type="text" id="id_model_name" name="model_name" value="{{ selected_model }}">
+            </div>
+
+            <h3>Items Waiting on Client / Blocked / Overdue</h3>
+            {% if attention_tasks %}
+                <ul style="padding-left: 18px;">
+                    {% for task in attention_tasks %}
+                        <li>
+                            <strong>{{ task.title }}</strong> —
+                            <span class="badge badge-{{ task.status }}">{{ task.get_status_display }}</span>
+                            {% if task.due_date %}(Due: {{ task.due_date }}){% endif %}
+                        </li>
+                    {% endfor %}
+                </ul>
+            {% else %}
+                <p class="help-text">No tasks are currently blocked, overdue, or waiting on client. Follow-up will reference remaining open tasks.</p>
+            {% endif %}
+
+            <div class="actions-row" style="margin-top: 16px;">
+                <button type="submit" name="mode" value="followup" class="btn btn-primary">
+                    Draft Client Follow-Up
+                </button>
+                <button type="submit" name="mode" value="summary" class="btn btn-secondary">
+                    Generate Project Summary
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <div class="card">
+        <h2>Generated Output</h2>
+        {% if generated_text %}
+            <p class="help-text">
+                {% if mode == 'summary' %}
+                    Project Health Summary (for daily/weekly check-ins)
+                {% else %}
+                    Client Follow-Up Draft (saved to internal timeline for your review)
+                {% endif %}
+            </p>
+            <div class="ai-box">{{ generated_text }}</div>
+        {% else %}
+            <p class="empty-state">
+                Click <strong>Draft Client Follow-Up</strong> or <strong>Generate Project Summary</strong> to run your local Ollama model.
+            </p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

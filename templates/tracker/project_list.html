@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+
+{% block title %}Projects | PM AI Tracker{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1>Projects</h1>
+        <p class="subtitle">
+            {% if is_coordinator %}
+                Manage client projects, track internal deliverables, and run AI summaries.
+            {% else %}
+                Projects assigned to your account.
+            {% endif %}
+        </p>
+    </div>
+    {% if is_coordinator %}
+        <div class="actions-row">
+            <a href="{% url 'project_create' %}" class="btn btn-primary">+ New Project</a>
+        </div>
+    {% endif %}
+</div>
+
+<div class="card">
+    {% if projects %}
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Project</th>
+                        <th>Client</th>
+                        <th>Status</th>
+                        <th>Open Tasks</th>
+                        <th>Blocked</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for project in projects %}
+                        <tr>
+                            <td>
+                                <a href="{% url 'project_detail' project.pk %}"><strong>{{ project.name }}</strong></a>
+                                {% if project.description %}
+                                    <div class="help-text">{{ project.description|truncatechars:90 }}</div>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {{ project.client_name }}
+                                {% if project.client_user %}
+                                    <div class="help-text">Login: {{ project.client_user.username }}</div>
+                                {% endif %}
+                            </td>
+                            <td><span class="badge badge-{{ project.status }}">{{ project.get_status_display }}</span></td>
+                            <td>{{ project.open_tasks }} / {{ project.total_tasks }}</td>
+                            <td>
+                                {% if project.blocked_tasks %}
+                                    <span class="badge badge-blocked">{{ project.blocked_tasks }}</span>
+                                {% else %}
+                                    0
+                                {% endif %}
+                            </td>
+                            <td class="actions-row">
+                                <a href="{% url 'project_detail' project.pk %}" class="btn btn-secondary btn-sm">Open</a>
+                                {% if is_coordinator %}
+                                    <a href="{% url 'project_edit' project.pk %}" class="btn btn-secondary btn-sm">Edit</a>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <p class="empty-state">
+            {% if is_coordinator %}
+                No projects yet. Click "+ New Project" to create one.
+            {% else %}
+                No projects are assigned to your login yet. Ask your coordinator to link your username to a project.
+            {% endif %}
+        </p>
+    {% endif %}
+</div>
+{% endblock %}

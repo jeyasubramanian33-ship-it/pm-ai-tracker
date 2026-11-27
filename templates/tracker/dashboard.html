@@ -1,0 +1,195 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard | PM AI Tracker{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1>{% if is_coordinator %}Coordinator Dashboard{% else %}Client Portal{% endif %}</h1>
+        <p class="subtitle">
+            {% if is_coordinator %}
+                Monitor project health, client blockers, and internal handoffs.
+            {% else %}
+                Track your active deliverables and share updates with your coordinator.
+            {% endif %}
+        </p>
+    </div>
+    {% if is_coordinator %}
+        <div class="actions-row">
+            <a href="{% url 'project_create' %}" class="btn btn-primary">+ New Project</a>
+        </div>
+    {% endif %}
+</div>
+
+{% if is_coordinator %}
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-label">Active Projects</div>
+            <div class="stat-value">{{ active_projects_count }}</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Blocked Tasks</div>
+            <div class="stat-value stat-danger">{{ blocked_count }}</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Waiting on Client</div>
+            <div class="stat-value stat-warning">{{ waiting_client_count }}</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Overdue Tasks</div>
+            <div class="stat-value stat-danger">{{ overdue_count }}</div>
+        </div>
+    </div>
+
+    <div class="two-col">
+        <div class="card">
+            <h2>Tasks Needing Attention</h2>
+            {% if urgent_tasks %}
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Task</th>
+                                <th>Project</th>
+                                <th>Status</th>
+                                <th>Due</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for task in urgent_tasks %}
+                                <tr>
+                                    <td>
+                                        <a href="{% url 'project_detail' task.project.pk %}">{{ task.title }}</a>
+                                        {% if task.assignee_name %}
+                                            <div class="help-text">Team: {{ task.assignee_name }}</div>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ task.project.name }}</td>
+                                    <td><span class="badge badge-{{ task.status }}">{{ task.get_status_display }}</span></td>
+                                    <td>
+                                        {{ task.due_date|default:"—" }}
+                                        {% if task.is_overdue %}<span class="overdue-tag">Overdue</span>{% endif %}
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <p class="empty-state">No blocked, overdue, or waiting-on-client tasks right now.</p>
+            {% endif %}
+        </div>
+
+        <div>
+            <div class="card">
+                <h2>Recent Client Updates</h2>
+                {% if recent_client_updates %}
+                    {% for log in recent_client_updates %}
+                        <div class="timeline-item">
+                            <div class="timeline-meta">
+                                <strong>{{ log.project.name }}</strong> &bull; {{ log.created_at|date:"M d, H:i" }}
+                            </div>
+                            <div>{{ log.raw_content|truncatechars:140 }}</div>
+                            <div style="margin-top: 6px;">
+                                <a href="{% url 'ai_client_intake' log.project.pk %}?log_id={{ log.pk }}" class="btn btn-secondary btn-sm">
+                                    Analyze with AI
+                                </a>
+                            </div>
+                        </div>
+                    {% endfor %}
+                {% else %}
+                    <p class="empty-state">No client updates logged yet.</p>
+                {% endif %}
+            </div>
+
+            <div class="card">
+                <h2>Your Projects</h2>
+                {% if projects %}
+                    {% for project in projects %}
+                        <div style="padding: 8px 0; border-bottom: 1px solid var(--border);">
+                            <a href="{% url 'project_detail' project.pk %}"><strong>{{ project.name }}</strong></a>
+                            <div class="help-text">
+                                Client: {{ project.client_name }} &bull; {{ project.done_tasks }}/{{ project.total_tasks }} tasks done
+                            </div>
+                        </div>
+                    {% endfor %}
+                {% else %}
+                    <p class="empty-state">No projects yet. Create your first project to get started.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+{% else %}
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-label">Assigned Projects</div>
+            <div class="stat-value">{{ total_projects_count }}</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Open Tasks</div>
+            <div class="stat-value">{{ open_tasks_count }}</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Waiting on You</div>
+            <div class="stat-value stat-warning">{{ waiting_on_me_count }}</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Completed</div>
+            <div class="stat-value">{{ done_tasks_count }}</div>
+        </div>
+    </div>
+
+    <div class="two-col">
+        <div class="card">
+            <h2>Items Waiting on Your Input</h2>
+            {% if waiting_tasks %}
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Task</th>
+                                <th>Project</th>
+                                <th>Due</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for task in waiting_tasks %}
+                                <tr>
+                                    <td>{{ task.title }}</td>
+                                    <td>{{ task.project.name }}</td>
+                                    <td>{{ task.due_date|default:"—" }}</td>
+                                    <td>
+                                        <a href="{% url 'project_detail' task.project.pk %}#client-update" class="btn btn-secondary btn-sm">
+                                            Post Update
+                                        </a>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <p class="empty-state">Nothing is waiting on your input right now.</p>
+            {% endif %}
+        </div>
+
+        <div class="card">
+            <h2>Your Projects</h2>
+            {% if projects %}
+                {% for project in projects %}
+                    <div style="padding: 10px 0; border-bottom: 1px solid var(--border);">
+                        <a href="{% url 'project_detail' project.pk %}"><strong>{{ project.name }}</strong></a>
+                        <div class="help-text">
+                            <span class="badge badge-{{ project.status }}">{{ project.get_status_display }}</span>
+                            &bull; {{ project.done_tasks }}/{{ project.total_tasks }} tasks done
+                        </div>
+                    </div>
+                {% endfor %}
+            {% else %}
+                <p class="empty-state">No projects have been assigned to your client account yet.</p>
+            {% endif %}
+        </div>
+    </div>
+{% endif %}
+{% endblock %}
